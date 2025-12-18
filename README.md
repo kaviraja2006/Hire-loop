@@ -120,4 +120,30 @@ This file contains all required environment variables such as:
 
 ```gitignore
 .env*
-!.env.example
+
+---
+
+# Concept-3: Cloud Deployments 101: Docker → CI/CD → AWS/Azure
+
+This project simulates a full-stack cloud deployment workflow using **Docker** for containerization and **GitHub Actions** for CI/CD.
+
+## Containerization Strategy
+We containerized the Next.js application to ensure consistency across development, staging, and production environments.
+
+*   **Dockerfile**: Uses a multi-stage build (base → deps → builder → runner) to create an optimized, lightweight image.
+*   **Docker Compose**: Enables easy local testing of the containerized application.
+*   **Optimization**: We utilize Next.js `output: "standalone"` to bundle only the necessary files, significantly reducing the final image size.
+
+## CI/CD Pipeline
+We implemented a **Build & Push** pipeline using GitHub Actions:
+
+1.  **Trigger**: Runs on every push to the `main` branch.
+2.  **Build**: Creates the Docker image using the `Dockerfile`.
+3.  **Push**: Pushes the tagged image to **GitHub Container Registry (GHCR)**.
+    *(Note: This workflow is designed to be easily adaptable for AWS ECR or Azure ACR)*.
+4.  **Security**: Secrets like `NEXT_PUBLIC_APP_URL` are injected safely during the build process.
+
+## Reflection
+*   **Challenges**: Configuring the `standalone` output correctly in `next.config.ts` was crucial for keeping the image size down.
+*   **Successes**: The multi-stage Dockerfile successfully separates build dependencies from runtime dependencies.
+*   **Future Improvements**: Implement Infrastructure as Code (IaC) with Terraform to provision the actual cloud resources (e.g., AWS ECS or Azure Container Apps) automatically.
