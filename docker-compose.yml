@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hireloop-web
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      # Add other necessary environment variables here if needed for local testing
+      # keys are placeholders, real apps should use secrets or .env files appropriately
