@@ -92,22 +92,12 @@
     "public.experience_level": {
       "name": "experience_level",
       "schema": "public",
-      "values": [
-        "Entry Level",
-        "Mid-Level",
-        "Senior",
-        "Manager"
-      ]
+      "values": ["Entry Level", "Mid-Level", "Senior", "Manager"]
     },
     "public.job_type": {
       "name": "job_type",
       "schema": "public",
-      "values": [
-        "Full-time",
-        "Part-time",
-        "Contract",
-        "Internship"
-      ]
+      "values": ["Full-time", "Part-time", "Contract", "Internship"]
     }
   },
   "schemas": {},

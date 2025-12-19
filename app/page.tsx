@@ -17,7 +17,8 @@ export default async function Home() {
           <div className="mb-6 flex justify-between items-center">
             <h2 className="text-2xl font-semibold">Latest Opportunities</h2>
             <p className="text-sm text-gray-500">
-              Last updated: {new Date(timestamp).toLocaleTimeString()} (ISR - 60s)
+              Last updated: {new Date(timestamp).toLocaleTimeString()} (ISR -
+              60s)
             </p>
           </div>
           <JobFeed />

@@ -11,28 +11,29 @@
 ## 📁 Part 1: Environment File Setup (1 minute)
 
 ### Script:
+
 "First, let's look at our environment file structure. We have four main environment files:"
 
 **Show on screen**: File explorer with:
+
 - `.env.example` (✅ tracked)
 - `.env.development` (❌ gitignored)
 - `.env.staging` (❌ gitignored)
 - `.env.production` (❌ gitignored)
 
 ### Talk Points:
+
 1. **`.env.example`** - "This is our template file. It's safe to commit to Git because it contains only placeholder values"
    - Open the file and highlight the placeholder values
-   
 2. **`.env.development`** - "For local development. Contains development database and Clerk credentials"
    - Show: localhost URLs, development database
-   
 3. **`.env.staging`** - "Pre-production testing environment. Uses staging database and staging Clerk instance"
    - Show: staging URLs, separate database
-   
 4. **`.env.production`** - "Production template. Real secrets stored in GitHub Secrets, not here"
    - Emphasize: "This is just a template - actual secrets are never committed"
 
 ### Demo:
+
 ```bash
 # Show .gitignore to prove env files are protected
 cat .gitignore | grep env
@@ -43,28 +44,34 @@ cat .gitignore | grep env
 ## 🔐 Part 2: Secrets Management (1.5 minutes)
 
 ### Script:
+
 "Now let's see how we securely manage secrets for each environment."
 
 **Show on screen**: Navigate to `docs/SECRETS_MANAGEMENT.md`
 
 ### Demo 1: GitHub Secrets (Recommended approach)
+
 1. Open browser → GitHub repository → Settings → Secrets and variables → Actions
-2. Show (or describe if not set up): 
+2. Show (or describe if not set up):
    - `CLERK_SECRET_KEY_STAGING`
    - `DATABASE_URL_STAGING`
    - `CLERK_SECRET_KEY_PRODUCTION`
    - `DATABASE_URL_PRODUCTION`
 
 ### Script:
+
 "We store secrets in GitHub Secrets for three main reasons:
+
 1. **Security**: Secrets never appear in our codebase or Git history
 2. **Isolation**: Each environment has completely separate credentials
 3. **Automation**: CI/CD pipelines inject secrets during deployment"
 
 ### Demo 2: Alternative Options
+
 **Show on screen**: Scroll through SECRETS_MANAGEMENT.md
 
 "I've also documented two alternatives:
+
 - **AWS Parameter Store** - For AWS-heavy infrastructure
 - **Azure Key Vault** - For Microsoft ecosystem
 
@@ -75,17 +82,20 @@ All three approaches follow the same principle: Never commit secrets to Git."
 ## 🏗️ Part 3: Environment-Specific Builds (1 minute)
 
 ### Script:
+
 "Let's see how builds differ across environments."
 
 **Show on screen**: Open `package.json` scripts section
 
 ### Demo:
+
 ```bash
 # Show the build scripts
 cat package.json | grep -A 5 "scripts"
 ```
 
 ### Talk Points:
+
 "We have separate build commands for each environment:
 
 1. **Development**: `npm run build:development`
@@ -104,6 +114,7 @@ cat package.json | grep -A 5 "scripts"
    - Optimized for performance"
 
 ### Demo:
+
 ```bash
 # Show validation script
 npm run validate:env
@@ -121,12 +132,15 @@ npm run build:staging
 ## 🚀 Part 4: CI/CD Integration (45 seconds)
 
 ### Script:
+
 "Finally, let's look at how this integrates with continuous deployment."
 
 **Show on screen**: `.github/workflows/deploy-staging.yml`
 
 ### Talk Points:
+
 "Our GitHub Actions workflow:
+
 1. Checks out code
 2. Loads secrets from GitHub Secrets
 3. Creates environment file dynamically
@@ -135,6 +149,7 @@ npm run build:staging
 6. Deploys to the appropriate environment"
 
 **Highlight in file**:
+
 ```yaml
 - name: Create staging environment file
   run: |
@@ -150,11 +165,13 @@ npm run build:staging
 ## 🎯 Part 5: Challenges & Solutions (45 seconds)
 
 ### Script:
+
 "During implementation, I faced three main challenges:"
 
 **Show on screen**: README.md - Challenges section
 
 ### Challenge 1: Environment Variable Management
+
 "**Problem**: Easy to forget required variables
 **Solution**: Created `validate-env.js` script that checks for missing variables before each build"
 
@@ -164,10 +181,12 @@ node scripts/validate-env.js
 ```
 
 ### Challenge 2: Build Command Complexity
+
 "**Problem**: Different commands for different environments was confusing
 **Solution**: Used `env-cmd` package to simplify - one command pattern for all environments"
 
 ### Challenge 3: Secret Synchronization
+
 "**Problem**: Team members needed to know which secrets to set up
 **Solution**: Comprehensive documentation in SECRETS_MANAGEMENT.md with step-by-step guides for GitHub, AWS, and Azure"
 
@@ -176,6 +195,7 @@ node scripts/validate-env.js
 ## 📊 Part 6: Why This Matters (30 seconds)
 
 ### Script:
+
 "This multi-environment setup provides five key benefits:"
 
 **Show on screen**: README benefits section
@@ -194,6 +214,7 @@ node scripts/validate-env.js
 ## 🎓 Conclusion (15 seconds)
 
 ### Script:
+
 "In summary, we've implemented:
 ✅ Environment-specific configuration files
 ✅ Secure secret management with GitHub Secrets
@@ -209,6 +230,7 @@ All of this ensures our deployments are secure, consistent, and reliable across 
 ## 📋 Pre-Recording Checklist
 
 Before recording, ensure:
+
 - [ ] All files are created and saved
 - [ ] Terminal is clean and ready
 - [ ] Browser tabs are open (GitHub Secrets page)
@@ -237,6 +259,7 @@ Before recording, ensure:
 ## 🔗 Final Step
 
 Replace the placeholder in README.md:
+
 ```markdown
 [📺 Watch Video Walkthrough](your-google-drive-link-here)
 ```

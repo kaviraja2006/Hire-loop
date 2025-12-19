@@ -21,35 +21,36 @@ Perfect for CI/CD pipelines using GitHub Actions.
 #### Setup Steps
 
 1. **Navigate to Repository Settings**
+
    ```
    Your Repo → Settings → Secrets and variables → Actions
    ```
 
 2. **Add Repository Secrets**
-   
+
    Click "New repository secret" and add each secret:
-   
+
    ```
    Name: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY_STAGING
    Value: pk_live_xxxxx
-   
+
    Name: CLERK_SECRET_KEY_STAGING
    Value: sk_live_xxxxx
-   
+
    Name: DATABASE_URL_STAGING
    Value: postgres://user:pass@host/db
    ```
 
 3. **Add Environment-Specific Secrets**
-   
+
    Create separate environments:
    - `staging` environment with staging secrets
    - `production` environment with production secrets
 
 4. **Use in Workflows**
-   
+
    Reference secrets in GitHub Actions:
-   
+
    ```yaml
    - name: Build Application
      env:
@@ -62,12 +63,14 @@ Perfect for CI/CD pipelines using GitHub Actions.
 #### Pros & Cons
 
 ✅ **Pros:**
+
 - Free for GitHub repositories
 - Native integration with GitHub Actions
 - Easy to set up and manage
 - Environment-based access control
 
 ❌ **Cons:**
+
 - GitHub-specific (not portable)
 - Limited to CI/CD usage
 - No secret versioning
@@ -81,10 +84,11 @@ Best for applications deployed on AWS infrastructure.
 #### Setup Steps
 
 1. **Install AWS CLI**
+
    ```bash
    # macOS
    brew install awscli
-   
+
    # Linux
    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
    unzip awscliv2.zip
@@ -92,6 +96,7 @@ Best for applications deployed on AWS infrastructure.
    ```
 
 2. **Configure AWS Credentials**
+
    ```bash
    aws configure
    # AWS Access Key ID: YOUR_ACCESS_KEY
@@ -100,19 +105,19 @@ Best for applications deployed on AWS infrastructure.
    ```
 
 3. **Store Secrets as SecureString Parameters**
-   
+
    ```bash
    # Store staging secrets
    aws ssm put-parameter \
      --name "/hireloop/staging/clerk/publishable-key" \
      --value "pk_live_xxxxx" \
      --type "SecureString"
-   
+
    aws ssm put-parameter \
      --name "/hireloop/staging/clerk/secret-key" \
      --value "sk_live_xxxxx" \
      --type "SecureString"
-   
+
    aws ssm put-parameter \
      --name "/hireloop/staging/database/url" \
      --value "postgres://user:pass@host/db" \
@@ -120,49 +125,51 @@ Best for applications deployed on AWS infrastructure.
    ```
 
 4. **Retrieve Secrets in Application**
-   
+
    Create a helper script `scripts/load-aws-secrets.js`:
-   
+
    ```javascript
    const { SSMClient, GetParameterCommand } = require("@aws-sdk/client-ssm");
-   const fs = require('fs');
-   
+   const fs = require("fs");
+
    async function loadSecrets(environment) {
-     const client = new SSMClient({ region: process.env.AWS_REGION || "us-east-1" });
-     
+     const client = new SSMClient({
+       region: process.env.AWS_REGION || "us-east-1",
+     });
+
      const secrets = [
-       'clerk/publishable-key',
-       'clerk/secret-key',
-       'database/url'
+       "clerk/publishable-key",
+       "clerk/secret-key",
+       "database/url",
      ];
-     
-     let envContent = '';
-     
+
+     let envContent = "";
+
      for (const secret of secrets) {
        const command = new GetParameterCommand({
          Name: `/hireloop/${environment}/${secret}`,
-         WithDecryption: true
+         WithDecryption: true,
        });
-       
+
        const response = await client.send(command);
-       const envVarName = secret.toUpperCase().replace(/\//g, '_');
+       const envVarName = secret.toUpperCase().replace(/\//g, "_");
        envContent += `${envVarName}=${response.Parameter.Value}\n`;
      }
-     
-     fs.writeFileSync('.env.local', envContent);
+
+     fs.writeFileSync(".env.local", envContent);
    }
-   
-   loadSecrets(process.argv[2] || 'staging');
+
+   loadSecrets(process.argv[2] || "staging");
    ```
 
 5. **Use in CI/CD**
-   
+
    ```yaml
    - name: Load secrets from AWS
      run: |
        npm install @aws-sdk/client-ssm
        node scripts/load-aws-secrets.js production
-   
+
    - name: Build
      run: npm run build:production
    ```
@@ -170,6 +177,7 @@ Best for applications deployed on AWS infrastructure.
 #### Pros & Cons
 
 ✅ **Pros:**
+
 - Free tier available (10,000 parameters)
 - Encrypted at rest
 - Fine-grained IAM permissions
@@ -177,6 +185,7 @@ Best for applications deployed on AWS infrastructure.
 - Works across any CI/CD platform
 
 ❌ **Cons:**
+
 - Requires AWS account and setup
 - More complex than GitHub Secrets
 - AWS-specific
@@ -190,24 +199,27 @@ Ideal for applications deployed on Azure or using Microsoft ecosystem.
 #### Setup Steps
 
 1. **Install Azure CLI**
+
    ```bash
    # macOS
    brew install azure-cli
-   
+
    # Linux
    curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
    ```
 
 2. **Login to Azure**
+
    ```bash
    az login
    ```
 
 3. **Create Key Vault**
+
    ```bash
    # Create resource group
    az group create --name hireloop-rg --location eastus
-   
+
    # Create key vault
    az keyvault create \
      --name hireloop-vault \
@@ -216,18 +228,19 @@ Ideal for applications deployed on Azure or using Microsoft ecosystem.
    ```
 
 4. **Store Secrets**
+
    ```bash
    # Store staging secrets
    az keyvault secret set \
      --vault-name hireloop-vault \
      --name staging-clerk-publishable-key \
      --value "pk_live_xxxxx"
-   
+
    az keyvault secret set \
      --vault-name hireloop-vault \
      --name staging-clerk-secret-key \
      --value "sk_live_xxxxx"
-   
+
    az keyvault secret set \
      --vault-name hireloop-vault \
      --name staging-database-url \
@@ -235,7 +248,7 @@ Ideal for applications deployed on Azure or using Microsoft ecosystem.
    ```
 
 5. **Retrieve Secrets**
-   
+
    ```bash
    # Get a secret
    az keyvault secret show \
@@ -245,20 +258,20 @@ Ideal for applications deployed on Azure or using Microsoft ecosystem.
    ```
 
 6. **Use in CI/CD**
-   
+
    For GitHub Actions with Azure:
-   
+
    ```yaml
    - name: Azure Login
      uses: azure/login@v1
      with:
        creds: ${{ secrets.AZURE_CREDENTIALS }}
-   
+
    - name: Get secrets from Key Vault
      run: |
        echo "CLERK_SECRET_KEY=$(az keyvault secret show --vault-name hireloop-vault --name production-clerk-secret-key --query value -o tsv)" >> .env.production
        echo "DATABASE_URL=$(az keyvault secret show --vault-name hireloop-vault --name production-database-url --query value -o tsv)" >> .env.production
-   
+
    - name: Build
      run: npm run build:production
    ```
@@ -266,6 +279,7 @@ Ideal for applications deployed on Azure or using Microsoft ecosystem.
 #### Pros & Cons
 
 ✅ **Pros:**
+
 - Highly secure and compliant
 - Secret versioning and lifecycle management
 - RBAC and access policies
@@ -273,6 +287,7 @@ Ideal for applications deployed on Azure or using Microsoft ecosystem.
 - Supports hardware security modules (HSM)
 
 ❌ **Cons:**
+
 - Requires Azure subscription (paid)
 - More complex setup
 - Azure-specific
@@ -300,6 +315,7 @@ Ideal for applications deployed on Azure or using Microsoft ecosystem.
 ## 🎬 CI/CD Workflow Examples
 
 See our example workflows:
+
 - [`.github/workflows/deploy-staging.yml`](../.github/workflows/deploy-staging.yml)
 - [`.github/workflows/deploy-production.yml`](../.github/workflows/deploy-production.yml)
 
@@ -314,6 +330,7 @@ See our example workflows:
 ### Set Up Alerts
 
 Configure alerts for:
+
 - Secret access from unusual locations
 - Failed authentication attempts
 - Secret modifications

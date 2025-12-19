@@ -5,6 +5,7 @@ This guide explains how to configure and manage environment-specific builds for 
 ## 📋 Overview
 
 Our application supports three distinct environments:
+
 - **Development** - Local development on your machine
 - **Staging** - Pre-production testing environment
 - **Production** - Live production environment
@@ -82,28 +83,32 @@ npm start
 
 ## 📁 Environment Files Explained
 
-| File | Purpose | Tracked in Git? |
-|------|---------|----------------|
-| `.env.example` | Template showing all required variables | ✅ Yes |
-| `.env.local` | Your local development secrets | ❌ No |
-| `.env.development` | Development environment config | ❌ No |
-| `.env.staging` | Staging environment config | ❌ No |
-| `.env.production` | Production environment config (template only) | ❌ No |
+| File               | Purpose                                       | Tracked in Git? |
+| ------------------ | --------------------------------------------- | --------------- |
+| `.env.example`     | Template showing all required variables       | ✅ Yes          |
+| `.env.local`       | Your local development secrets                | ❌ No           |
+| `.env.development` | Development environment config                | ❌ No           |
+| `.env.staging`     | Staging environment config                    | ❌ No           |
+| `.env.production`  | Production environment config (template only) | ❌ No           |
 
 ## 🔐 Required Environment Variables
 
 ### Clerk Authentication
+
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Public key (safe to expose)
 - `CLERK_SECRET_KEY` - Secret key (NEVER expose client-side)
 
 ### Database
+
 - `DATABASE_URL` - PostgreSQL connection string
 
 ### Application URLs
+
 - `NEXT_PUBLIC_API_URL` - Backend API endpoint
 - `NEXT_PUBLIC_APP_URL` - Frontend application URL
 
 ### Optional Settings
+
 - `NEXT_PUBLIC_ENABLE_DEBUG` - Enable debug mode (development only)
 - `NEXT_PUBLIC_LOG_LEVEL` - Logging verbosity
 
@@ -116,6 +121,7 @@ npm run validate:env
 ```
 
 This script checks:
+
 - All required variables are set
 - No placeholder values remain
 - Environment files exist
@@ -139,6 +145,7 @@ This script checks:
 ## 🚀 CI/CD Integration
 
 See [SECRETS_MANAGEMENT.md](./SECRETS_MANAGEMENT.md) for details on:
+
 - Storing secrets in GitHub Secrets
 - AWS Parameter Store integration
 - Azure Key Vault integration
@@ -152,6 +159,7 @@ See [SECRETS_MANAGEMENT.md](./SECRETS_MANAGEMENT.md) for details on:
 ### Changes not reflecting after switching environments
 
 **Solution:** Stop the dev server, switch environment files, and restart:
+
 ```bash
 # Stop server (Ctrl+C)
 npm run build:staging
@@ -161,6 +169,7 @@ npm start
 ### Environment variables not loading
 
 **Solution:** Ensure you're using the correct command:
+
 ```bash
 # ✅ Correct
 npm run build:staging

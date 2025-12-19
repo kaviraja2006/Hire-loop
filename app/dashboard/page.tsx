@@ -3,10 +3,10 @@ import UserJobList from "@/components/features/dashboard/UserJobList";
 import Container from "@/components/ui/Container";
 
 // Force dynamic rendering - Server-Side Rendering on every request
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export default async function Dashboard() {
-  const { userId } = await auth();
+  await auth();
 
   // This data is fetched fresh on EVERY request (SSR)
   const currentTime = new Date().toLocaleString();
