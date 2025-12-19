@@ -7,27 +7,27 @@ on:
   workflow_dispatch:
 
 env:
-  NODE_VERSION: '20.x'
+  NODE_VERSION: "20.x"
 
 jobs:
   deploy-production:
     name: Build and Deploy to Production
     runs-on: ubuntu-latest
     environment: production
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      
+          cache: "npm"
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Create production environment file
         run: |
           echo "NODE_ENV=production" > .env.production
@@ -40,7 +40,7 @@ jobs:
           echo "NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up" >> .env.production
           echo "NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard" >> .env.production
           echo "NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard" >> .env.production
-      
+
       - name: Validate environment
         run: npm run validate:env
         env:
@@ -50,24 +50,24 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL_PRODUCTION }}
           NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL_PRODUCTION }}
-      
+
       - name: Run tests
         run: npm test
         continue-on-error: false
-      
+
       - name: Build application
         run: npm run build:production
-      
+
       - name: Run database migrations
         run: npx drizzle-kit push
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
-      
+
       - name: Production deployment approval check
         run: |
           echo "🚀 Ready to deploy to PRODUCTION"
           echo "This deployment will affect live users!"
-      
+
       # Deploy to your hosting provider
       # Example for Vercel:
       - name: Deploy to Vercel (Production)
@@ -76,9 +76,9 @@ jobs:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'
+          vercel-args: "--prod"
           scope: ${{ secrets.VERCEL_ORG_ID }}
-      
+
       # Or for custom VPS deployment:
       # - name: Deploy to Production Server
       #   uses: appleboy/scp-action@master
@@ -98,19 +98,19 @@ jobs:
       #     script: |
       #       cd /var/www/hireloop-production
       #       pm2 restart hireloop
-      
+
       - name: Notify deployment success
         if: success()
         run: |
           echo "✅ Production deployment successful!"
           echo "URL: ${{ secrets.NEXT_PUBLIC_APP_URL_PRODUCTION }}"
-      
+
       - name: Notify deployment failure
         if: failure()
         run: |
           echo "❌ Production deployment failed!"
           echo "Please investigate immediately!"
-      
+
       # Optional: Slack/Discord notification
       # - name: Notify team
       #   if: always()
