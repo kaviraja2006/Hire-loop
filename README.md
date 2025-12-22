@@ -92,34 +92,48 @@ If traffic increased **10×**:
 
 # Concept-2: Environment-Aware Builds & Secrets Management
 
-This project follows **production-safe configuration practices** by separating code from configuration and managing secrets securely.
+This project follows **production-safe configuration practices** by separating code from configuration and managing secrets securely. We use strict naming conventions to prevent accidental exposure of server-side secrets to the client.
 
 ---
 
-## Current Environment Setup
+## Environment Files
 
-For local development, the project uses:
+We use two primary files for environment configuration:
 
-This file contains all required environment variables such as:
-
-- Clerk authentication keys
-- Database connection string
-- API endpoints
+- **`.env.local`**: Contains **actual secrets** (API keys, Database URLs). This file is **gitignored** and never committed.
+- **`.env.example`**: A template file listing all required variables with placeholders. Developers copy this to `.env.local` and fill in their values.
 
 ---
 
-## Important Notes
+## Safe Server-Side Access
 
-- `.env.local` is **never committed to GitHub**
-- Secrets are injected at **build or runtime**
-- Sensitive variables are kept **server-only** unless explicitly marked `NEXT_PUBLIC_`
+Next.js automatically inlines variables starting with `NEXT_PUBLIC_` into the client-side bundle at build time. All other variables are available **only on the server**.
+
+### Usage Code Snippets
+
+```typescript
+// ✅ Server-Side Only (Safe)
+// This variable is NOT exposed to the browser
+const dbUrl = process.env.DATABASE_URL;
+
+// ✅ Client-Side Accessible
+// This variable IS exposed to the browser because of the prefix
+const publicApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+```
+
+**Common Pitfall Avoided**: We proactively check that `CLERK_SECRET_KEY` and `DATABASE_URL` are strictly used in server components or API routes, ensuring they never leak to the client.
 
 ---
 
-## Git Safety
+## Protecting Secrets
+
+To ensure secrets are never leaked, our `.gitignore` is configured to exclude all local environment files:
 
 ```gitignore
+# Ignore local environment files
 .env*
+!.env.example
+
 
 ---
 
