@@ -580,10 +580,10 @@ To ensure smooth collaboration, consistent code quality, and specific version co
 
 We use a consistent naming convention for our branches:
 
-*   **`feature/<feature-name>`**: For new features (e.g., `feature/login-auth`)
-*   **`fix/<bug-name>`**: For bug fixes (e.g., `fix/navbar-alignment`)
-*   **`chore/<task-name>`**: For maintenance tasks (e.g., `chore/dependency-updates`)
-*   **`docs/<update-name>`**: For documentation updates (e.g., `docs/readme-update`)
+- **`feature/<feature-name>`**: For new features (e.g., `feature/login-auth`)
+- **`fix/<bug-name>`**: For bug fixes (e.g., `fix/navbar-alignment`)
+- **`chore/<task-name>`**: For maintenance tasks (e.g., `chore/dependency-updates`)
+- **`docs/<update-name>`**: For documentation updates (e.g., `docs/readme-update`)
 
 ## Pull Request Process
 
@@ -594,33 +594,35 @@ We use a consistent naming convention for our branches:
 5.  Request a review from a team member.
 
 ### PR Template
+
 Our PR template (`.github/pull_request_template.md`) prompts for:
-*   Summary of changes
-*   Type of change
-*   Readiness checklist
-*   Screenshots/evidence
+
+- Summary of changes
+- Type of change
+- Readiness checklist
+- Screenshots/evidence
 
 ## Code Review Checklist
 
 Reviewers must verify the following before approving:
 
-*   [ ] **Lint & Build**: CI checks pass successfully.
-*   [ ] **No Console Errors**: Code runs without errors in the browser console.
-*   [ ] **Local Testing**: Functionality works as expected.
-*   [ ] **Standards**: Code follows naming conventions and security best practices.
+- [ ] **Lint & Build**: CI checks pass successfully.
+- [ ] **No Console Errors**: Code runs without errors in the browser console.
+- [ ] **Local Testing**: Functionality works as expected.
+- [ ] **Standards**: Code follows naming conventions and security best practices.
 
 ## Branch Protection Rules
 
 The `main` branch is protected to prevent direct commits and ensure quality.
 
 **Configuration:**
-*   **Require a pull request before merging**: No direct pushes to `main`.
-*   **Require approvals**: At least 1 review is needed.
-*   **Require status checks to pass before merging**: Linting and build steps must succeed.
 
-*(Add your valid screenshot here)*
+- **Require a pull request before merging**: No direct pushes to `main`.
+- **Require approvals**: At least 1 review is needed.
+- **Require status checks to pass before merging**: Linting and build steps must succeed.
+
+_(Add your valid screenshot here)_
 ![Branch Protection Rules Placeholder](https://via.placeholder.com/800x400?text=Branch+Protection+Rules+Screenshot)
-
 
 ---
 
@@ -629,48 +631,136 @@ The `main` branch is protected to prevent direct commits and ensure quality.
 This section documents the containerization of the full-stack application using Docker and Docker Compose.
 
 ## 1. Dockerfile
+
 We utilize a development-focused `Dockerfile` to enable hot-reloading and smoother developer experience.
+
 - **Base Image**: `node:20-alpine` was chosen for its small footprint and security.
 - **Development Mode**: Initializes the app with `npm run dev` to support hot code reloading, mirroring the local development experience within the container.
 - **Volume Mapping**: Maps the local directory to the container to ensure code changes are instantly reflected.
 
 ## 2. Docker Compose Services
+
 We defined 3 services in `docker-compose.yml`:
 
 ### App (`app`)
+
 - Builds from the local `Dockerfile`.
 - Connects to `db` and `redis` services.
 - Exposes port `3000` to localhost.
-- **Environment**: 
+- **Environment**:
   - `DATABASE_URL`: Points to the `db` service (e.g., `postgresql://...@db:5432/...`).
   - `REDIS_URL`: Points to the `redis` service.
 
 ### Database (`db`)
+
 - **Image**: `postgres:alpine`.
 - **Port**: `5432`.
 - **Volumes**: Uses `postgres_data` volume to persist data across restarts.
 - **Environment**: Sets `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`.
 
 ### Cache (`redis`)
+
 - **Image**: `redis:alpine`.
 - **Port**: `6379`.
 - **Networking**: Accessible to the app via hostname `redis`.
 
 ## 3. Networking & Volumes
+
 - **Network**: All services run on a shared bridge network `hireloop-network`. This enables internal DNS resolution (e.g., `ping db`).
 - **Volume**: `postgres_data` ensures that your database content survives if you remove the containers.
 
 ## 4. Problems Faced & Solutions
+
 - **Connection Strings**: The application runs inside a container, so it cannot access the DB via `localhost`. We fixed this by using the Docker service name `db` in the `DATABASE_URL`.
 - **Build Errors**: Switched from a multi-stage production build to a simple development build to avoid build-time errors related to missing environment variables (e.g., Clerk keys).
 - **Container Conflicts**: Encountered "Container name already in use" errors when restarting. Solved by running `docker compose down` to clean up old containers before starting again.
 
 ## 5. Reflection Question
+
 **“If your entire team had to onboard a new developer tomorrow, how would Docker Compose make that process faster and smoother?”**
 
-**Answer**: Docker Compose radically simplifies onboarding by replacing pages of installation instructions with a single command: `docker-compose up`. 
+**Answer**: Docker Compose radically simplifies onboarding by replacing pages of installation instructions with a single command: `docker-compose up`.
+
 - **Consistency**: Every developer gets the exact same versions of Node, Postgres, and Redis.
 - **Speed**: No need to manually install databases or manage background services.
 - **Reliability**: Eliminates "works on my machine" issues caused by environment differences.
 
+---
 
+# Assignment: Database Design & Implementation
+
+This section checks off the requirements for relational schema design, Prisma implementation, and database fundamentals.
+
+## 1. Schema Design (Prisma)
+
+We transitioned from a Drizzle-based "ToDo" style schema to a relational **Talent Hiring** schema.
+
+### Prisma Schema (`prisma/schema.prisma`)
+
+```prisma
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  role         Role          @default(CANDIDATE) // Enum: RECRUITER, CANDIDATE
+  postedJobs   Job[]         @relation("PostedJobs")
+  applications Application[]
+}
+
+model Job {
+  id          String        @id @default(uuid())
+  title       String
+  recruiterId String
+  recruiter   User          @relation("PostedJobs", fields: [recruiterId], references: [id])
+  applications Application[]
+}
+
+model Application {
+  id          String   @id @default(uuid())
+  jobId       String
+  candidateId String
+  status      ApplicationStatus @default(PENDING) // Enum: PENDING, REVIEWED, etc.
+
+  job         Job      @relation(fields: [jobId], references: [id])
+  candidate   User     @relation(fields: [candidateId], references: [id])
+
+  @@unique([jobId, candidateId]) // Prevent duplicate applications
+}
+```
+
+## 2. Explanation of Entities & Relations
+
+| Entity          | Purpose                                          | Relationships                                                                                                      |
+| :-------------- | :----------------------------------------------- | :----------------------------------------------------------------------------------------------------------------- |
+| **User**        | Represents all actors (Recruiters & Candidates). | **1-N with Jobs**: A recruiter posts many jobs.<br>**1-N with Applications**: A candidate makes many applications. |
+| **Job**         | A job listing posted by a specific recruiter.    | **Belongs to User**: Linked via `recruiterId`.<br>**1-N with Applications**: A job receives many applications.     |
+| **Application** | Connects a Candidate to a Job (Join Table).      | **M-N Link**: Resolves the Many-to-Many relationship between User and Job.                                         |
+
+### Design Choices
+
+- **UUIDs**: Used for primary keys (`@default(uuid())`) to ensure global uniqueness and security (not guessable like auto-increment integers).
+- **Cascading Deletes**: `onDelete: Cascade` ensures that if a User or Job is deleted, all related data (Applications) are cleaned up automatically.
+- **Enums**: Used `Role` and `ApplicationStatus` to enforce data integrity at the database level.
+
+## 3. Normalization Reflection
+
+- **No Data Redundancy**: We didn't duplicate `companyName` or `recruiterEmail` in the `Job` table; we just referenced `User` via `recruiterId`.
+- **Atomic Values**: `location`, `salary`, and `title` are distinct columns, not stuffed into a JSON blob.
+- **Consistency**: The `@@unique([jobId, candidateId])` constraint prevents a candidate from spamming the same job with multiple applications.
+
+## 4. Implementation Challenges & Solutions
+
+| Challenge                | Issue                                           | Solution                                                                                                                                                                |
+| :----------------------- | :---------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Connection Error**     | `P1001: Can't reach database server at db:5432` | The migration command runs on the **host**, but `db` is a Docker service name. <br>✅ **Fix**: Overrode `DATABASE_URL` to point to `localhost:5432` for local commands. |
+| **Missing Dependencies** | `Module not found: effect` inside Prisma 7      | Prisma 7.2.0 had unstable dependencies in this environment. <br>✅ **Fix**: Downgraded to **Prisma 5 (Stable)** which worked perfectly.                                 |
+| **Invalid Provider**     | `Error: spawn prisma-client ENOENT`             | The generated schema had `provider = "prisma-client"`. <br>✅ **Fix**: Changed to standard `provider = "prisma-client-js"`.                                             |
+| **Seeding Environment**  | `PrismaClient` defaulted to `.env`              | Seed script failed to connect to `db` host. <br>✅ **Fix**: Passed `DATABASE_URL` via environment variable to the seed command.                                         |
+
+## 5. Reflection Question (Scaling to 10x Users)
+
+**"If your database had to support 10x more users and data tomorrow, what design choices you made today would help it scale efficiently?"**
+
+1.  **Indexed Foreign Keys**: Prisma automatically indexes `recruiterId` and `jobId`. This means looking up "All jobs by Recruiter X" or "All applications for Job Y" remains fast even with millions of rows.
+2.  **Normalized Schema**: By separating Users and Jobs, we avoid massive storage waste. If a recruiter changes their name, we update 1 row in `User`, not 10,000 rows in `Job`.
+3.  **Relational Integrity**: The Join Table (`Application`) is scalable. We didn't store "applied candidate IDs" in a massive array column on the `Job` table (which would hit size limits).
+4.  **Enums**: Using efficient database enums instead of strings saves storage space.

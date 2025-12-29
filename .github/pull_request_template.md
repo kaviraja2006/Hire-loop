@@ -1,27 +1,28 @@
-# Pull Request
-
 ## Summary
-<!-- Provide a brief summary of the changes introduced by this PR. -->
 
-## Type of Change
-<!-- Check the relevant option(s) -->
-- [ ] 🚀 Feature (New functionality)
-- [ ] 🐛 Bug Fix (Fixes an issue)
-- [ ] 🔧 Chore (Refactoring, maintenance, config)
-- [ ] 📝 Documentation (Updates to docs)
+This Pull Request sets up a standardized GitHub workflow for the project, including a branching strategy, pull request process, code review checklist, and protected main branch rules.
 
 ## Changes Made
-<!-- List the key changes in detail -->
-- 
-- 
-- 
 
-## Screenshots / Evidence
-<!-- Add screenshots, GIFs, or logs if applicable -->
+- Added documentation for branch naming conventions
+- Defined pull request and code review workflow
+- Configured branch protection rules for the main branch
+- Updated README with full workflow explanation
 
-## Readiness Checklist
-<!-- ensure all points are checked before requesting review -->
-- [ ] 🟢 Lint and build pass successfully
-- [ ] 🚫 No console errors
-- [ ] 💻 Functionality tested locally
-- [ ] 🛡️ Code follows naming conventions and security best practices
+## Testing & Verification
+
+- Documentation reviewed locally
+- Repository structure verified
+- Branch protection rules tested by attempting direct push to main
+
+## Evidence
+
+Screenshots of branch protection rules and a successful pull request with all checks passing are included in the README.
+
+## Checklist
+
+- [x] Branch naming conventions followed
+- [x] No direct commits to main
+- [x] Pull request reviewed before merge
+- [x] All required checks passed
+- [x] Ready for merge
