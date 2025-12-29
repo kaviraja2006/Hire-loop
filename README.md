@@ -621,3 +621,56 @@ The `main` branch is protected to prevent direct commits and ensure quality.
 *(Add your valid screenshot here)*
 ![Branch Protection Rules Placeholder](https://via.placeholder.com/800x400?text=Branch+Protection+Rules+Screenshot)
 
+
+---
+
+# Assignment: Local Docker Infrastructure
+
+This section documents the containerization of the full-stack application using Docker and Docker Compose.
+
+## 1. Dockerfile
+We utilize a development-focused `Dockerfile` to enable hot-reloading and smoother developer experience.
+- **Base Image**: `node:20-alpine` was chosen for its small footprint and security.
+- **Development Mode**: Initializes the app with `npm run dev` to support hot code reloading, mirroring the local development experience within the container.
+- **Volume Mapping**: Maps the local directory to the container to ensure code changes are instantly reflected.
+
+## 2. Docker Compose Services
+We defined 3 services in `docker-compose.yml`:
+
+### App (`app`)
+- Builds from the local `Dockerfile`.
+- Connects to `db` and `redis` services.
+- Exposes port `3000` to localhost.
+- **Environment**: 
+  - `DATABASE_URL`: Points to the `db` service (e.g., `postgresql://...@db:5432/...`).
+  - `REDIS_URL`: Points to the `redis` service.
+
+### Database (`db`)
+- **Image**: `postgres:alpine`.
+- **Port**: `5432`.
+- **Volumes**: Uses `postgres_data` volume to persist data across restarts.
+- **Environment**: Sets `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`.
+
+### Cache (`redis`)
+- **Image**: `redis:alpine`.
+- **Port**: `6379`.
+- **Networking**: Accessible to the app via hostname `redis`.
+
+## 3. Networking & Volumes
+- **Network**: All services run on a shared bridge network `hireloop-network`. This enables internal DNS resolution (e.g., `ping db`).
+- **Volume**: `postgres_data` ensures that your database content survives if you remove the containers.
+
+## 4. Problems Faced & Solutions
+- **Connection Strings**: The application runs inside a container, so it cannot access the DB via `localhost`. We fixed this by using the Docker service name `db` in the `DATABASE_URL`.
+- **Build Errors**: Switched from a multi-stage production build to a simple development build to avoid build-time errors related to missing environment variables (e.g., Clerk keys).
+- **Container Conflicts**: Encountered "Container name already in use" errors when restarting. Solved by running `docker compose down` to clean up old containers before starting again.
+
+## 5. Reflection Question
+**“If your entire team had to onboard a new developer tomorrow, how would Docker Compose make that process faster and smoother?”**
+
+**Answer**: Docker Compose radically simplifies onboarding by replacing pages of installation instructions with a single command: `docker-compose up`. 
+- **Consistency**: Every developer gets the exact same versions of Node, Postgres, and Redis.
+- **Speed**: No need to manually install databases or manage background services.
+- **Reliability**: Eliminates "works on my machine" issues caused by environment differences.
+
+
