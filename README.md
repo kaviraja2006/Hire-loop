@@ -570,6 +570,54 @@ These foundations support:
 - Automated testing setup
 - Monorepo scaling with shared configs
 
-```
+---
 
-```
+# Development Workflow
+
+To ensure smooth collaboration, consistent code quality, and specific version control practices, we follow a standardized GitHub branching and pull-request workflow.
+
+## Branching Strategy
+
+We use a consistent naming convention for our branches:
+
+*   **`feature/<feature-name>`**: For new features (e.g., `feature/login-auth`)
+*   **`fix/<bug-name>`**: For bug fixes (e.g., `fix/navbar-alignment`)
+*   **`chore/<task-name>`**: For maintenance tasks (e.g., `chore/dependency-updates`)
+*   **`docs/<update-name>`**: For documentation updates (e.g., `docs/readme-update`)
+
+## Pull Request Process
+
+1.  Create a new branch from `main`.
+2.  Make your changes and commit them.
+3.  Open a Pull Request (PR) to merge into `main`.
+4.  The **PR Template** will automatically load to guide your description.
+5.  Request a review from a team member.
+
+### PR Template
+Our PR template (`.github/pull_request_template.md`) prompts for:
+*   Summary of changes
+*   Type of change
+*   Readiness checklist
+*   Screenshots/evidence
+
+## Code Review Checklist
+
+Reviewers must verify the following before approving:
+
+*   [ ] **Lint & Build**: CI checks pass successfully.
+*   [ ] **No Console Errors**: Code runs without errors in the browser console.
+*   [ ] **Local Testing**: Functionality works as expected.
+*   [ ] **Standards**: Code follows naming conventions and security best practices.
+
+## Branch Protection Rules
+
+The `main` branch is protected to prevent direct commits and ensure quality.
+
+**Configuration:**
+*   **Require a pull request before merging**: No direct pushes to `main`.
+*   **Require approvals**: At least 1 review is needed.
+*   **Require status checks to pass before merging**: Linting and build steps must succeed.
+
+*(Add your valid screenshot here)*
+![Branch Protection Rules Placeholder](https://via.placeholder.com/800x400?text=Branch+Protection+Rules+Screenshot)
+
