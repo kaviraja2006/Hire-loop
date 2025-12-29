@@ -764,3 +764,45 @@ model Application {
 2.  **Normalized Schema**: By separating Users and Jobs, we avoid massive storage waste. If a recruiter changes their name, we update 1 row in `User`, not 10,000 rows in `Job`.
 3.  **Relational Integrity**: The Join Table (`Application`) is scalable. We didn't store "applied candidate IDs" in a massive array column on the `Job` table (which would hit size limits).
 4.  **Enums**: Using efficient database enums instead of strings saves storage space.
+
+---
+
+# Assignment: Prisma Setup & Connection
+
+This section documents the integration of Prisma ORM, providing a type-safe data access layer to our PostgreSQL database.
+
+## Setup Process
+
+1.  **Installation**: Installed `prisma` and `@prisma/client`.
+2.  **Initialization**: Created `lib/prisma.ts` to instantiate a singleton `PrismaClient` (preventing connection exhaustion in development).
+3.  **Generation**: Ran `npx prisma generate` to create the type-safe client based on `schema.prisma`.
+
+## Database Connection
+
+The application connects to the PostgreSQL database service (`db`) defined in `docker-compose.yml`.
+
+- **Development**: Uses `DATABASE_URL` from `.env` (pointing to localhost or Docker service).
+- **Client**: The `prisma` instance is exported from `lib/prisma.ts` for use in Server Actions and API routes.
+
+## Connection Verification
+
+We created a script `scripts/test-db.ts` to verify the connection.
+
+**Test Output:**
+
+```bash
+Connecting to database...
+Successfully connected to database!
+Found 2 users.
+Sample user: {
+  id: '71dddaf3-109f-4993-b170-113c3eb8368f',
+  email: 'recruiter@hireloop.com',
+  name: 'Alice Recruiter',
+  role: 'RECRUITER',
+  createdAt: 2025-12-29T06:17:01.138Z
+}
+```
+
+## Reflection: Why Prisma?
+
+Prisma significantly accelerates development by auto-generating type definitions that match our database schema. This eliminates mismatched types between the DB and code. The fluent API (`prisma.user.findMany()`) is more readable than raw SQL joins, and the migration workflow keeps our team in sync.
