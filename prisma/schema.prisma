@@ -1,0 +1,96 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum Role {
+  CANDIDATE
+  RECRUITER
+}
+
+enum JobType {
+  FULL_TIME   @map("Full-time")
+  PART_TIME   @map("Part-time")
+  CONTRACT    @map("Contract")
+  INTERNSHIP  @map("Internship")
+}
+
+enum ExperienceLevel {
+  ENTRY_LEVEL @map("Entry Level")
+  MID_LEVEL   @map("Mid-Level")
+  SENIOR      @map("Senior")
+  MANAGER     @map("Manager")
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWED
+  INTERVIEWING
+  REJECTED
+  OFFERED
+}
+
+// Models
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  role      Role     @default(CANDIDATE)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  postedJobs   Job[]         @relation("PostedJobs")
+  applications Application[]
+
+  @@map("users")
+}
+
+model Job {
+  id             String          @id @default(uuid())
+  title          String
+  company        String
+  location       String
+  jobType        JobType         @map("job_type")
+  experienceLevel ExperienceLevel @map("experience_level")
+  salary         String?
+  description    String
+  applicationUrl String?         @map("application_url") // Optional if applying via platform
+  postedAt       DateTime        @default(now()) @map("posted_at")
+  
+  // Foreign Keys
+  recruiterId    String          @map("recruiter_id")
+  recruiter      User            @relation("PostedJobs", fields: [recruiterId], references: [id], onDelete: Cascade)
+
+  // Relations
+  applications   Application[]
+
+  @@index([recruiterId])
+  @@map("jobs")
+}
+
+model Application {
+  id          String            @id @default(uuid())
+  status      ApplicationStatus @default(PENDING)
+  appliedAt   DateTime          @default(now()) @map("applied_at")
+
+  // Foreign Keys
+  jobId       String            @map("job_id")
+  job         Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  candidateId String            @map("candidate_id")
+  candidate   User              @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, candidateId]) // Prevent duplicate applications
+  @@index([jobId])
+  @@index([candidateId])
+  @@map("applications")
+}
