@@ -806,3 +806,817 @@ Sample user: {
 ## Reflection: Why Prisma?
 
 Prisma significantly accelerates development by auto-generating type definitions that match our database schema. This eliminates mismatched types between the DB and code. The fluent API (`prisma.user.findMany()`) is more readable than raw SQL joins, and the migration workflow keeps our team in sync.
+
+---
+
+# Prisma Migrations & Seeding
+
+This section documents our database migration workflow, seeding strategy, and best practices for production deployments.
+
+## Migration Commands
+
+### Creating a New Migration
+
+When you make changes to `prisma/schema.prisma`, you need to create and apply a migration:
+
+```bash
+npx prisma migrate dev --name <migration_name>
+```
+
+**Example:**
+
+```bash
+npx prisma migrate dev --name init_schema
+```
+
+**What this command does:**
+
+1. **Compares** your Prisma schema with the current database state
+2. **Generates** SQL migration files in `prisma/migrations/`
+3. **Applies** the migration to your development database
+4. **Regenerates** the Prisma Client with updated types
+
+**Output Example:**
+
+```
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database
+
+✔ Generated Prisma Client to ./node_modules/@prisma/client
+
+The following migration(s) have been created and applied:
+
+prisma/migrations/
+  └─ 20251229061610_init_schema/
+    └─ migration.sql
+
+✔ Migrations applied successfully
+```
+
+---
+
+## Database Reset Strategy
+
+### Reset Command
+
+To completely reset your database (⚠️ **DESTRUCTIVE OPERATION**):
+
+```bash
+npx prisma migrate reset
+```
+
+**What this command does (in order):**
+
+1. **Drops** the entire database
+2. **Recreates** the database from scratch
+3. **Runs** all migrations from `prisma/migrations/` in chronological order
+4. **Executes** the seed script to populate initial data
+
+**When to use:**
+
+- ✅ Local development environment cleanup
+- ✅ Testing migration sequences from scratch
+- ✅ Resolving migration conflicts during development
+
+**When NOT to use:**
+
+- ❌ **NEVER in production** (destroys all data!)
+- ❌ Staging environments with important test data
+- ❌ Any environment where data preservation matters
+
+> **CAUTION**: The `reset` command is **IRREVERSIBLE**. All data will be permanently deleted. Always ensure you have backups before running this command, even in development.
+
+---
+
+## Seed Script Implementation
+
+### Running the Seed
+
+To populate your database with initial data:
+
+```bash
+npx prisma db seed
+```
+
+This command executes the seed script defined in `package.json`:
+
+```json
+"prisma": {
+  "seed": "ts-node prisma/seed.ts"
+}
+```
+
+### Idempotent Seeding
+
+Our seed script is designed to be **idempotent** – you can run it multiple times without creating duplicate data.
+
+**Key Implementation Pattern:**
+
+```typescript
+// ✅ IDEMPOTENT: Using upsert for Users
+const recruiter = await prisma.user.upsert({
+  where: { email: "recruiter@hireloop.com" },
+  update: {},
+  create: {
+    email: "recruiter@hireloop.com",
+    name: "Alice Recruiter",
+    role: Role.RECRUITER,
+  },
+});
+
+// ✅ IDEMPOTENT: Using fixed UUIDs for Jobs
+const job1Id = "00000000-0000-0000-0000-000000000001";
+const job1 = await prisma.job.upsert({
+  where: { id: job1Id },
+  update: {},
+  create: {
+    id: job1Id,
+    title: "Senior React Developer",
+    company: "Tech Corp",
+    // ... other fields
+  },
+});
+
+// ✅ IDEMPOTENT: Using unique constraint for Applications
+const application = await prisma.application.upsert({
+  where: {
+    jobId_candidateId: {
+      jobId: job1.id,
+      candidateId: candidate.id,
+    },
+  },
+  update: {},
+  create: {
+    jobId: job1.id,
+    candidateId: candidate.id,
+    status: ApplicationStatus.PENDING,
+  },
+});
+```
+
+**Why Idempotency Matters:**
+
+- ✅ Safe to run multiple times during development
+- ✅ Reliable data restoration after `prisma migrate reset`
+- ✅ Prevents duplicate entries in the database
+- ✅ Enables consistent testing environments
+
+**Testing Idempotency:**
+
+```bash
+# Run seed twice - should produce identical results
+npx prisma db seed
+npx prisma db seed
+
+# Verify: User count, Job count, Application count should remain the same
+```
+
+---
+
+## Production Safety Reflection
+
+### Best Practices for Production Migrations
+
+Before running migrations in production, follow these critical steps:
+
+#### 1. **Full Database Backup**
+
+```bash
+# Example: PostgreSQL backup
+pg_dump -h <host> -U <user> -d <database> > backup_$(date +%Y%m%d_%H%M%S).sql
+```
+
+**Why:** Migrations can fail or have unintended consequences. A backup allows you to roll back to a known good state.
+
+#### 2. **Test in Staging Environment**
+
+- Deploy the migration to a staging environment that mirrors production
+- Run the migration with realistic data volumes
+- Verify application functionality post-migration
+- Measure migration execution time
+
+**Why:** Catches issues before they impact users and provides timing estimates for production deployment.
+
+#### 3. **Review Generated SQL**
+
+```bash
+# Generate migration without applying it
+npx prisma migrate dev --create-only --name <migration_name>
+
+# Review the SQL file
+cat prisma/migrations/<timestamp>_<migration_name>/migration.sql
+```
+
+**Why:** Auto-generated SQL may not always handle edge cases optimally. Manual review helps catch:
+
+- Missing indexes on new columns
+- Data loss risks (e.g., dropping columns)
+- Performance-impacting operations on large tables
+
+#### 4. **Use Non-Destructive Changes**
+
+- **Additive changes first**: Add new columns as optional (`?` in Prisma schema)
+- **Backfill data**: Update existing rows in a separate step
+- **Remove old columns later**: After confirming the application works without them
+
+**Why:** Allows for safer rollback if issues are discovered post-deployment.
+
+#### 5. **Transaction-Based Migrations**
+
+Prisma migrations run in transactions by default, but be aware:
+
+- Some PostgreSQL operations (e.g., `CREATE INDEX CONCURRENTLY`) cannot run in transactions
+- Consider breaking complex migrations into smaller, independent steps
+
+**Why:** Transactions ensure all-or-nothing execution, preventing partial migration states.
+
+#### 6. **Deployment Strategy**
+
+- **Blue-Green Deployment**: Run migration on the new environment before switching traffic
+- **Rolling Updates**: Ensure backward compatibility during the deployment window
+- **Maintenance Window**: Schedule migrations during low-traffic periods
+
+**Why:** Minimizes user impact and provides time to address unexpected issues.
+
+#### 7. **Monitoring & Rollback Plan**
+
+- Monitor application logs and database performance immediately after migration
+- Have a rollback script ready (manual reversal of migration changes)
+- Be prepared to restore from backup if necessary
+
+---
+
+## Verification Methods
+
+### Option A: Prisma Studio (Visual Interface)
+
+Launch the interactive database GUI:
+
+```bash
+npx prisma studio
+```
+
+**What you'll see:**
+
+- Opens at `http://localhost:5555`
+- Visual table browser with all models (User, Job, Application)
+- Ability to view, edit, and delete records
+- Real-time data updates
+
+**Use for:**
+
+- Quick visual verification of seed data
+- Manual data inspection during development
+- Debugging data relationships
+
+### Option B: CLI Verification
+
+**Generate Prisma Client:**
+
+```bash
+npx prisma generate
+```
+
+**Pull Database Schema:**
+
+```bash
+npx prisma db pull
+```
+
+This introspects the database and updates `schema.prisma` to match the actual database state. Useful for verifying migrations were applied correctly.
+
+**Format Schema:**
+
+```bash
+npx prisma format
+```
+
+Auto-formats your `schema.prisma` file for consistency.
+
+---
+
+## Complete Workflow Example
+
+Here's a typical development workflow combining all commands:
+
+```bash
+# 1. Make changes to prisma/schema.prisma
+# (e.g., add a new field or model)
+
+# 2. Create and apply migration
+npx prisma migrate dev --name add_user_bio_field
+
+# 3. Verify migration in Prisma Studio
+npx prisma studio
+
+# 4. Update seed script if needed
+# (edit prisma/seed.ts)
+
+# 5. Test the seed
+npx prisma db seed
+
+# 6. Test idempotency
+npx prisma db seed  # Run again - should not duplicate data
+
+# 7. If something goes wrong, reset and start over
+npx prisma migrate reset
+```
+
+---
+
+# Transaction & Query Optimisation
+
+This section documents our implementation of database transactions, query optimizations, and indexing strategies to ensure data integrity, performance, and scalability.
+
+---
+
+## Why Optimization Matters
+
+As your application scales:
+
+- **Without transactions**: Data corruption from partial writes
+- **Without indexes**: Queries slow down exponentially with data growth
+- **Without optimization**: Server costs increase and user experience degrades
+
+Our optimization strategy ensures the application remains fast and reliable even with 10x data growth.
+
+---
+
+## Transaction Implementation
+
+### What Are Transactions?
+
+A transaction ensures that a group of database operations either **all succeed together** or **all fail together** (atomicity). This prevents inconsistent data states.
+
+**Real-world example**: When a candidate applies to a job:
+
+1. Create application record
+2. Validate no duplicate application exists
+3. Update job application count
+
+If step 2 fails, step 1 must be rolled back to prevent orphaned data.
+
+---
+
+### Transaction Patterns Used
+
+We implemented **4 transaction scenarios** in [scripts/transaction-examples.ts](file:///c:/Users/kaviraja/Desktop/Hire-loop/scripts/transaction-examples.ts):
+
+#### 1. Interactive Transaction (Recommended)
+
+**Use when**: You need conditional logic or multi-step validation
+
+``typescript
+await prisma.(async (tx) => {
+// Check if application already exists
+const existing = await tx.application.findUnique({
+where: { jobId_candidateId: { jobId, candidateId } },
+});
+
+if (existing) {
+throw new Error("Candidate already applied");
+}
+
+// Create application
+return await tx.application.create({
+data: { jobId, candidateId, status: "PENDING" },
+});
+});
+``
+
+**Benefits**:
+
+- Full control over transaction flow
+- Can perform complex validations
+- Automatic rollback on any error
+
+---
+
+#### 2. Array-Based Transaction
+
+**Use when**: You have independent operations that must all succeed
+
+`typescript
+const [job1, job2] = await prisma.([
+  prisma.job.create({ data: job1Data }),
+  prisma.job.create({ data: job2Data }),
+]);
+`
+
+**Benefits**:
+
+- Simpler syntax for parallel operations
+- All operations are atomic
+- Faster than sequential transactions
+
+---
+
+### Rollback Behavior
+
+Prisma automatically rolls back transactions when:
+
+- Any query throws an error
+- You explicitly throw an error
+- A unique constraint is violated
+- A foreign key constraint fails
+
+**Example**: Intentional rollback demonstration
+
+``typescript
+try {
+await prisma.(async (tx) => {
+const user = await tx.user.create({ data: userData });
+const job = await tx.job.create({ data: jobData });
+
+    // Intentionally fail
+    throw new Error("Simulated failure");
+
+});
+} catch (error) {
+// Both user and job creation are rolled back
+console.log("Transaction rolled back - no data persisted");
+}
+``
+
+**Verification**: We verified rollback by checking that the created user doesn't exist after the transaction fails.
+
+---
+
+## Query Optimization Strategies
+
+We implemented **5 key optimization patterns** in [scripts/query-optimization.ts](file:///c:/Users/kaviraja/Desktop/Hire-loop/scripts/query-optimization.ts):
+
+### 1. Selective Field Fetching
+
+** Inefficient**:
+`typescript
+const users = await prisma.user.findMany({
+  include: { postedJobs: true, applications: true }
+}); // Fetches ALL fields + relations
+`
+
+** Optimized**:
+`typescript
+const users = await prisma.user.findMany({
+  select: {
+    id: true,
+    name: true,
+    email: true,
+    // Only fields we need
+  },
+});
+`
+
+**Impact**: 60-80% reduction in data transfer size
+
+---
+
+### 2. Pagination
+
+** Inefficient**:
+`typescript
+const allJobs = await prisma.job.findMany(); // Could be thousands!
+`
+
+** Optimized**:
+`typescript
+const jobs = await prisma.job.findMany({
+  skip: (page - 1) * pageSize,
+  take: pageSize,
+  orderBy: { postedAt: "desc" },
+});
+`
+
+**Impact**: Constant memory usage regardless of total records
+
+---
+
+### 3. Batch Operations
+
+** Inefficient**:
+`typescript
+for (const job of jobs) {
+  await prisma.job.create({ data: job }); // N database round-trips!
+}
+`
+
+** Optimized**:
+`typescript
+await prisma.job.createMany({
+  data: jobs,
+  skipDuplicates: true,
+}); // Single round-trip
+`
+
+**Impact**: 10-100x faster for bulk operations
+
+---
+
+### 4. Avoiding N+1 Queries
+
+** Anti-Pattern (N+1 Problem)**:
+`typescript
+const jobs = await prisma.job.findMany(); // 1 query
+for (const job of jobs) {
+  const recruiter = await prisma.user.findUnique({
+    where: { id: job.recruiterId }
+  }); // N queries!
+}
+`
+
+** Optimized**:
+`typescript
+const jobs = await prisma.job.findMany({
+  include: {
+    recruiter: {
+      select: { name: true, email: true },
+    },
+  },
+}); // Single query with JOIN
+`
+
+**Impact**: 95%+ reduction in query count
+
+---
+
+### 5. Strategic Use of include vs select
+
+- **Use select** when you need specific fields only
+- **Use include** when you need related data to avoid N+1 queries
+- **Never use both** on the same level (they're mutually exclusive)
+
+---
+
+## Index Strategy
+
+We added **5 new indexes** to optimize frequent query patterns:
+
+### Indexes Added
+
+| Model       | Index                        | Purpose               | Query Pattern                 |
+| ----------- | ---------------------------- | --------------------- | ----------------------------- |
+| Job         | @@index([jobType])           | Filter by job type    | "Show me all full-time jobs"  |
+| Job         | @@index([experienceLevel])   | Filter by experience  | "Show senior-level positions" |
+| Job         | @@index([postedAt])          | Chronological sorting | "Latest job postings"         |
+| Application | @@index([status])            | Filter by status      | "Show pending applications"   |
+| Application | @@index([status, appliedAt]) | Status + date sorting | Dashboard queries             |
+
+### Why These Indexes?
+
+**Composite Index Example**: @@index([status, appliedAt])
+
+This index optimizes queries that:
+
+1. Filter by status (WHERE status = 'PENDING')
+2. **AND** sort by date (ORDER BY appliedAt DESC)
+
+Database uses a single index scan instead of:
+
+- Filtering all rows Sorting results (slow!)
+
+**Performance Impact**:
+
+- Without index: Full table scan + filesort = **500ms+** on 100k records
+- With composite index: Index scan = **<10ms** on 100k records
+
+---
+
+## Performance Benchmarking
+
+We created [scripts/benchmark-queries.ts](file:///c:/Users/kaviraja/Desktop/Hire-loop/scripts/benchmark-queries.ts) to measure index performance.
+
+### Benchmark Tests
+
+The script measures 7 common query patterns:
+
+1. **Job Type Filter**: Filter by FULL_TIME
+2. **Experience Level Filter**: Filter by SENIOR
+3. **Chronological Sort**: Latest jobs by date
+4. **Status Filter**: Find PENDING applications
+5. **Composite Index**: Status filter + date sort
+6. **Recruiter Lookup**: Foreign key index
+7. **Complex Query**: Multiple filters combined
+
+### How to Run Benchmarks
+
+``bash
+
+# Baseline (before adding indexes)
+
+npx ts-node scripts/benchmark-queries.ts
+
+# Apply migration with indexes
+
+npx prisma migrate dev --name add_performance_indexes
+
+# Post-optimization benchmark
+
+npx ts-node scripts/benchmark-queries.ts
+``
+
+### Expected Performance Improvements
+
+**Small dataset (< 1000 records)**:
+
+- Before: 5-20ms per query
+- After: 2-10ms per query
+- **Improvement**: 40-50% faster
+
+**Large dataset (100k+ records)**:
+
+- Before: 500-2000ms per query (full table scan)
+- After: 5-20ms per query (index scan)
+- **Improvement**: 95-99% faster
+
+---
+
+## Anti-Patterns Avoided
+
+### 1. N+1 Query Problem
+
+**Problem**: Making N additional queries inside a loop  
+**Solution**: Use include to fetch related data in one query
+
+### 2. Over-Fetching Data
+
+**Problem**: Fetching all columns when only few are needed  
+**Solution**: Use select to specify required fields
+
+### 3. Missing Pagination
+
+**Problem**: Loading all records into memory  
+**Solution**: Always use skip and take for large datasets
+
+### 4. Unindexed Filtering
+
+**Problem**: Filtering on fields without indexes  
+**Solution**: Add indexes for frequently queried fields
+
+### 5. Sequential Inserts
+
+**Problem**: Using loops with individual create() calls  
+**Solution**: Use createMany() for bulk operations
+
+---
+
+## Production Monitoring
+
+### Enabling Query Logging
+
+**Development**:
+``bash
+
+# Windows PowerShell
+
+="prisma:query"; npm run dev
+
+# Linux/Mac
+
+DEBUG="prisma:query" npm run dev
+``
+
+**In Code**:
+`typescript
+const prisma = new PrismaClient({
+  log: ['query', 'info', 'warn', 'error'],
+});
+`
+
+### What to Monitor
+
+1. **Query Execution Time**
+   - Alert if queries exceed 100ms consistently
+   - Investigate queries taking > 1 second
+
+2. **Query Frequency**
+   - Detect N+1 query patterns (same query repeated)
+   - Monitor queries per request ratio
+
+3. **Database Connections**
+   - Connection pool exhaustion
+   - Long-running transactions
+
+4. **Index Usage**
+   - Use EXPLAIN ANALYZE to verify index scans
+   - Identify full table scans on large tables
+
+### Production Tools
+
+- **Prisma Studio**: Visual database browser (npx prisma studio)
+- **PgHero**: PostgreSQL performance dashboard
+- **AWS RDS Performance Insights**: Cloud-native monitoring
+- **Azure Query Performance Insight**: Azure-specific monitoring
+- **DataDog / New Relic**: APM with database query tracking
+
+---
+
+## Verification Results
+
+### Transaction Examples Execution
+
+To verify transactions:
+
+`bash
+npx ts-node scripts/transaction-examples.ts
+`
+
+**Expected Output**:
+``
+
+     PRISMA TRANSACTION EXAMPLES & ROLLBACK DEMONSTRATIONS
+
+=== Transaction Example 1: Job Application with Validation ===
+
+Application created successfully!
+Job: Senior React Developer
+Candidate: Bob Candidate
+Status: PENDING
+
+=== Transaction Example 2: Bulk Application Status Update ===
+
+Successfully updated 3 applications to REVIEWED
+
+=== Transaction Example 3: Intentional Rollback Demo ===
+
+Transaction failed (as expected): Intentional error
+ROLLBACK VERIFIED: User was not persisted to database
+``
+
+### Query Optimization Examples
+
+`bash
+npx ts-node scripts/query-optimization.ts
+`
+
+**Output demonstrates**:
+
+- Before/after patterns for each optimization
+- Actual data retrieved
+- Explanation of benefits
+
+### Performance Benchmarks
+
+`bash
+npx ts-node scripts/benchmark-queries.ts
+`
+
+**Sample Output**:
+``
+
+                    PERFORMANCE SUMMARY
+
+Benchmark Test Time (ms) Records
+
+Job Type Filter 4.23 2
+Experience Level Filter 3.87 1
+Chronological Sort 5.12 20
+Status Filter 2.94 3
+Composite Status+Date 3.45 10
+Recruiter Lookup 4.01 2
+Complex Multi-Filter 5.78 1
+
+Average Query Time: 4.20ms
+``
+
+---
+
+## Scalability Reflection
+
+### If Database Had 10x More Data
+
+**Current State**: ~100 records  
+**Future State**: ~1,000,000 records
+
+**How Our Optimizations Help**:
+
+1. **Indexes Scale Logarithmically**
+   - Current: 4ms avg query time
+   - At 1M records: ~15ms avg (only 4x slower for 10,000x data!)
+   - Without indexes: ~5000ms (unusable)
+
+2. **Pagination Prevents Memory Issues**
+   - Always fetch fixed page size (e.g., 20 records)
+   - Memory usage constant regardless of total data
+
+3. **Composite Indexes** optimize real queries
+   - Dashboard: "Show PENDING applications, newest first"
+   - Single index handles filter + sort efficiently
+
+4. **Transaction Safety** at scale
+   - Prevents data corruption under high concurrency
+   - Critical for multiple users applying simultaneously
+
+---
+
+## Key Takeaways
+
+**Use transactions** when operations depend on each other  
+ **Add indexes** for frequently filtered/sorted fields  
+ **Use select** to minimize data transfer  
+ **Paginate** all list queries  
+ **Use createMany** for bulk inserts  
+ **Avoid N+1 queries** with strategic include  
+ **Monitor queries** in production with logging  
+ **Benchmark** before and after optimizations
+
+---

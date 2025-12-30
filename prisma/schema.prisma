@@ -74,6 +74,9 @@ model Job {
   applications   Application[]
 
   @@index([recruiterId])
+  @@index([jobType]) // Optimize filtering by job type
+  @@index([experienceLevel]) // Optimize filtering by experience level
+  @@index([postedAt]) // Optimize chronological sorting
   @@map("jobs")
 }
 
@@ -92,5 +95,7 @@ model Application {
   @@unique([jobId, candidateId]) // Prevent duplicate applications
   @@index([jobId])
   @@index([candidateId])
+  @@index([status]) // Optimize filtering by application status
+  @@index([status, appliedAt]) // Composite index for status filtering + date sorting
   @@map("applications")
 }
