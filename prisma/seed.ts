@@ -34,9 +34,18 @@ async function main() {
 
   console.log("Created Users:", { recruiter, candidate });
 
-  // Create Jobs
-  const job1 = await prisma.job.create({
-    data: {
+  // Create Jobs (idempotent with fixed IDs)
+  // Using fixed UUIDs ensures idempotency across multiple seed runs
+  const job1Id = "00000000-0000-0000-0000-000000000001";
+  const job2Id = "00000000-0000-0000-0000-000000000002";
+
+  const job1 = await prisma.job.upsert({
+    where: {
+      id: job1Id,
+    },
+    update: {},
+    create: {
+      id: job1Id,
       title: "Senior React Developer",
       company: "Tech Corp",
       location: "Remote",
@@ -49,8 +58,13 @@ async function main() {
     },
   });
 
-  const job2 = await prisma.job.create({
-    data: {
+  const job2 = await prisma.job.upsert({
+    where: {
+      id: job2Id,
+    },
+    update: {},
+    create: {
+      id: job2Id,
       title: "Junior Backend Engineer",
       company: "Tech Corp",
       location: "New York, NY",
@@ -65,9 +79,16 @@ async function main() {
 
   console.log("Created Jobs:", { job1, job2 });
 
-  // Create Application
-  const application = await prisma.application.create({
-    data: {
+  // Create Application (idempotent using unique constraint on jobId + candidateId)
+  const application = await prisma.application.upsert({
+    where: {
+      jobId_candidateId: {
+        jobId: job1.id,
+        candidateId: candidate.id,
+      },
+    },
+    update: {},
+    create: {
       jobId: job1.id,
       candidateId: candidate.id,
       status: ApplicationStatus.PENDING,
