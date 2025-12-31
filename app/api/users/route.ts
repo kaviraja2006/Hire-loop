@@ -4,6 +4,8 @@ import { UserCreateSchema } from "@/lib/validation";
 import { getPaginationParams, createPaginatedResponse } from "@/lib/api-utils";
 import { sendSuccess, sendError } from "@/lib/responseHandler";
 import { ERROR_CODES } from "@/lib/errorCodes";
+import { ZodError } from "zod";
+import { formatZodError } from "@/lib/zodErrorFormatter";
 
 /**
  * GET /api/users
@@ -82,6 +84,9 @@ export async function POST(request: NextRequest) {
 
     return sendSuccess(user, "User created successfully", 201);
   } catch (error) {
+    if (error instanceof ZodError) {
+      return formatZodError(error);
+    }
     return sendError(
       "Failed to create user",
       ERROR_CODES.DATABASE_FAILURE,

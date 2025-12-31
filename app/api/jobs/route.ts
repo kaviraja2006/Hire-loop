@@ -1,14 +1,12 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { JobCreateSchema } from "@/lib/validation";
-import {
-  getPaginationParams,
-  createPaginatedResponse,
-  handleError,
-  successResponse,
-  HttpStatus,
-} from "@/lib/api-utils";
+import { getPaginationParams, createPaginatedResponse } from "@/lib/api-utils";
 import { JobType, ExperienceLevel } from "@prisma/client";
+import { sendSuccess, sendError } from "@/lib/responseHandler";
+import { ERROR_CODES } from "@/lib/errorCodes";
+import { ZodError } from "zod";
+import { formatZodError } from "@/lib/zodErrorFormatter";
 
 /**
  * GET /api/jobs
@@ -72,9 +70,14 @@ export async function GET(request: NextRequest) {
       limit,
       skip,
     });
-    return successResponse(response);
+    return sendSuccess(response, "Jobs fetched successfully");
   } catch (error) {
-    return handleError(error);
+    return sendError(
+      "Failed to fetch jobs",
+      ERROR_CODES.DATABASE_FAILURE,
+      500,
+      error
+    );
   }
 }
 
@@ -111,8 +114,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return successResponse(job, HttpStatus.CREATED);
+    return sendSuccess(job, "Job created successfully", 201);
   } catch (error) {
-    return handleError(error);
+    if (error instanceof ZodError) {
+      return formatZodError(error);
+    }
+    return sendError(
+      "Failed to create job",
+      ERROR_CODES.DATABASE_FAILURE,
+      500,
+      error
+    );
   }
 }
