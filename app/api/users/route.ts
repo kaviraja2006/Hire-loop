@@ -1,13 +1,9 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { UserCreateSchema } from "@/lib/validation";
-import {
-  getPaginationParams,
-  createPaginatedResponse,
-  handleError,
-  successResponse,
-  HttpStatus,
-} from "@/lib/api-utils";
+import { getPaginationParams, createPaginatedResponse } from "@/lib/api-utils";
+import { sendSuccess, sendError } from "@/lib/responseHandler";
+import { ERROR_CODES } from "@/lib/errorCodes";
 
 /**
  * GET /api/users
@@ -52,9 +48,14 @@ export async function GET(request: NextRequest) {
       limit,
       skip,
     });
-    return successResponse(response);
+    return sendSuccess(response, "Users fetched successfully");
   } catch (error) {
-    return handleError(error);
+    return sendError(
+      "Failed to fetch users",
+      ERROR_CODES.DATABASE_FAILURE,
+      500,
+      error
+    );
   }
 }
 
@@ -79,8 +80,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return successResponse(user, HttpStatus.CREATED);
+    return sendSuccess(user, "User created successfully", 201);
   } catch (error) {
-    return handleError(error);
+    return sendError(
+      "Failed to create user",
+      ERROR_CODES.DATABASE_FAILURE,
+      500,
+      error
+    );
   }
 }
