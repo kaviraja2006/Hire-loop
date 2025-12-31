@@ -1620,3 +1620,191 @@ Average Query Time: 4.20ms
  **Benchmark** before and after optimizations
 
 ---
+
+# Assignment: Unified API Response Format
+
+This section documents our standardized API response structure that ensures consistency across all endpoints, enabling better frontend predictability and simplified error handling.
+
+## Response Handler Implementation
+
+We've implemented centralized response utilities in `lib/responseHandler.ts`:
+
+```typescript
+import { NextResponse } from "next/server";
+
+export const sendSuccess = (data: any, message = "Success", status = 200) => {
+  return NextResponse.json(
+    {
+      success: true,
+      message,
+      data,
+      timestamp: new Date().toISOString(),
+    },
+    { status }
+  );
+};
+
+export const sendError = (
+  message = "Something went wrong",
+  code = "INTERNAL_ERROR",
+  status = 500,
+  details?: any
+) => {
+  return NextResponse.json(
+    {
+      success: false,
+      message,
+      error: { code, details },
+      timestamp: new Date().toISOString(),
+    },
+    { status }
+  );
+};
+```
+
+## Error Codes
+
+Consistent error identifiers are defined in `lib/errorCodes.ts`:
+
+```typescript
+export const ERROR_CODES = {
+  VALIDATION_ERROR: "E001",
+  NOT_FOUND: "E002",
+  DATABASE_FAILURE: "E003",
+  INTERNAL_ERROR: "E500",
+};
+```
+
+## Unified Response Structure
+
+All API responses follow this envelope format:
+
+```json
+{
+  "success": boolean,
+  "message": string,
+  "data"?: any,
+  "error"?: {
+    "code": string,
+    "details"?: string
+  },
+  "timestamp": string
+}
+```
+
+### Example Success Response
+
+```json
+{
+  "success": true,
+  "message": "User created successfully",
+  "data": { "id": 12, "name": "Charlie" },
+  "timestamp": "2025-12-31T07:30:00.000Z"
+}
+```
+
+### Example Error Response
+
+```json
+{
+  "success": false,
+  "message": "Missing required field: title",
+  "error": {
+    "code": "E001"
+  },
+  "timestamp": "2025-12-31T07:30:00.000Z"
+}
+```
+
+## Implementation Examples
+
+### Users API Route (`/api/users`)
+
+```typescript
+import { sendSuccess, sendError } from "@/lib/responseHandler";
+import { ERROR_CODES } from "@/lib/errorCodes";
+
+export async function GET(request: NextRequest) {
+  try {
+    const users = await prisma.user.findMany();
+    return sendSuccess(users, "Users fetched successfully");
+  } catch (error) {
+    return sendError(
+      "Failed to fetch users",
+      ERROR_CODES.DATABASE_FAILURE,
+      500,
+      error
+    );
+  }
+}
+```
+
+### Tasks API Route (`/api/tasks`)
+
+```typescript
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+
+    if (!body.title) {
+      return sendError(
+        "Missing required field: title",
+        ERROR_CODES.VALIDATION_ERROR,
+        400
+      );
+    }
+
+    return sendSuccess(body, "Task created successfully", 201);
+  } catch (err) {
+    return sendError(
+      "Task creation failed",
+      ERROR_CODES.INTERNAL_ERROR,
+      500,
+      err
+    );
+  }
+}
+```
+
+## Developer Experience & Observability Benefits
+
+### 🎯 Better Frontend Predictability
+
+- **Single Response Format**: Frontend developers always know the exact shape of API responses
+- **Type Safety**: The consistent structure enables auto-completion and type checking in TypeScript
+- **Simplified Error Handling**: All errors follow the same pattern, reducing conditional logic
+
+### 🔍 Easier Debugging with Timestamps & Error Codes
+
+- **Timestamps**: Every response includes an ISO timestamp, making it easy to correlate frontend logs with backend logs
+- **Error Codes**: Structured error codes (`E001`, `E002`, etc.) enable quick identification of error types
+- **Searchable Logs**: Teams can quickly find all instances of a specific error code in monitoring systems
+
+### 📊 Improved Observability (Sentry / Logs)
+
+- **Consistent Structure**: Logging and monitoring tools can parse responses uniformly
+- **Error Categorization**: Error codes enable automatic grouping in Sentry or CloudWatch
+- **Trend Analysis**: Standardized format makes it easy to track error rates and success rates over time
+- **Alert Configuration**: Teams can set up precise alerts based on specific error codes
+
+### 🚀 Faster Onboarding for New Developers
+
+- **Single Pattern to Learn**: New developers only need to understand one response format
+- **Self-Documenting**: The response structure itself serves as documentation
+- **Fewer Surprises**: No need to guess what each endpoint returns
+- **Quick Integration**: Frontend developers can start consuming APIs immediately without waiting for detailed documentation
+
+---
+
+## Why This Pattern is Non-Negotiable
+
+If your API responses aren't standardized, your backend will not scale cleanly:
+
+- **Codebase Size**: As the API surface grows, inconsistent formats multiply technical debt
+- **Team Size**: New team members struggle with learning multiple response patterns
+- **Production Debugging**: Inconsistent error formats make it difficult to trace issues across distributed systems
+- **Client Integration**: Frontend teams waste time handling edge cases for different response formats
+
+This pattern is a **fundamental requirement** for professional full-stack systems.
+
+---
