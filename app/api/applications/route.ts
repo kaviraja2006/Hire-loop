@@ -1,14 +1,12 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ApplicationCreateSchema } from "@/lib/validation";
-import {
-  getPaginationParams,
-  createPaginatedResponse,
-  handleError,
-  successResponse,
-  HttpStatus,
-} from "@/lib/api-utils";
+import { getPaginationParams, createPaginatedResponse } from "@/lib/api-utils";
 import { ApplicationStatus } from "@prisma/client";
+import { sendSuccess, sendError } from "@/lib/responseHandler";
+import { ERROR_CODES } from "@/lib/errorCodes";
+import { ZodError } from "zod";
+import { formatZodError } from "@/lib/zodErrorFormatter";
 
 /**
  * GET /api/applications
@@ -68,9 +66,14 @@ export async function GET(request: NextRequest) {
       limit,
       skip,
     });
-    return successResponse(response);
+    return sendSuccess(response, "Applications fetched successfully");
   } catch (error) {
-    return handleError(error);
+    return sendError(
+      "Failed to fetch applications",
+      ERROR_CODES.DATABASE_FAILURE,
+      500,
+      error
+    );
   }
 }
 
@@ -109,8 +112,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return successResponse(application, HttpStatus.CREATED);
+    return sendSuccess(application, "Application created successfully", 201);
   } catch (error) {
-    return handleError(error);
+    if (error instanceof ZodError) {
+      return formatZodError(error);
+    }
+    return sendError(
+      "Failed to create application",
+      ERROR_CODES.DATABASE_FAILURE,
+      500,
+      error
+    );
   }
 }

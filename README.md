@@ -1808,3 +1808,583 @@ If your API responses aren't standardized, your backend will not scale cleanly:
 This pattern is a **fundamental requirement** for professional full-stack systems.
 
 ---
+
+# Assignment: Input Validation with Zod
+
+This section documents our comprehensive input validation strategy using **Zod**, a TypeScript-first schema validation library that ensures all API requests receive valid, well-structured data.
+
+## Why Input Validation Matters
+
+Every API needs to **trust but verify** the data it receives. Without validation:
+
+❌ Users might send malformed JSON or missing required fields  
+❌ The database could receive invalid or unexpected values  
+❌ The application becomes unpredictable and insecure  
+❌ Error messages are generic and unhelpful
+
+**Example Problem:**
+
+```json
+{
+  "name": "",
+  "email": "not-an-email"
+}
+```
+
+If your `/api/users` endpoint accepts this data unchecked, you risk database errors, broken records, and confused users.
+
+✅ **With Zod validation**, requests are validated **before** they reach your business logic, ensuring clean data and clear error messages.
+
+---
+
+## Schema Definitions
+
+All validation schemas are centralized in `lib/validation.ts`, providing type-safe schemas that match our Prisma database models.
+
+### User Schemas
+
+```typescript
+export const UserCreateSchema = z.object({
+  email: z.string().email("Invalid email format"),
+  name: z.string().min(1, "Name is required").optional(),
+  role: RoleEnum.default("CANDIDATE"), // CANDIDATE | RECRUITER
+});
+
+export const UserUpdateSchema = z
+  .object({
+    email: z.string().email("Invalid email format").optional(),
+    name: z.string().min(1, "Name cannot be empty").optional(),
+    role: RoleEnum.optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field must be provided for update",
+  });
+
+// TypeScript type inference
+export type UserCreateInput = z.infer<typeof UserCreateSchema>;
+```
+
+### Job Schemas
+
+```typescript
+export const JobCreateSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  company: z.string().min(1, "Company is required"),
+  location: z.string().min(1, "Location is required"),
+  jobType: JobTypeEnum, // FULL_TIME | PART_TIME | CONTRACT | INTERNSHIP
+  experienceLevel: ExperienceLevelEnum, // ENTRY_LEVEL | MID_LEVEL | SENIOR | MANAGER
+  salary: z.string().optional(),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  applicationUrl: z.string().url("Invalid URL format").optional(),
+  recruiterId: z.string().uuid("Invalid recruiter ID"),
+});
+
+export type JobCreateInput = z.infer<typeof JobCreateSchema>;
+```
+
+### Application Schemas
+
+```typescript
+export const ApplicationCreateSchema = z.object({
+  jobId: z.string().uuid("Invalid job ID"),
+  candidateId: z.string().uuid("Invalid candidate ID"),
+});
+
+export const ApplicationUpdateSchema = z.object({
+  status: ApplicationStatusEnum, // PENDING | REVIEWED | INTERVIEWING | REJECTED | OFFERED
+});
+```
+
+### Task Schemas
+
+```typescript
+export const TaskCreateSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z
+    .string()
+    .min(10, "Description must be at least 10 characters")
+    .optional(),
+});
+```
+
+---
+
+## Validation Flow in API Routes
+
+### Request Lifecycle
+
+1. **Request Received** → Client sends JSON data
+2. **Schema Parse** → Zod validates against schema
+3. **Success Path** → Valid data proceeds to database
+4. **Error Path** → Validation errors return immediately with 400 status
+
+### Implementation Pattern
+
+All POST/PUT API routes follow this consistent pattern:
+
+```typescript
+import { ZodError } from "zod";
+import { formatZodError } from "@/lib/zodErrorFormatter";
+import { UserCreateSchema } from "@/lib/validation";
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const validatedData = UserCreateSchema.parse(body);
+
+    // Data is guaranteed to be valid at this point
+    const user = await prisma.user.create({ data: validatedData });
+    return sendSuccess(user, "User created successfully", 201);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return formatZodError(error); // Returns 400 with field-level errors
+    }
+    return sendError(
+      "Failed to create user",
+      ERROR_CODES.DATABASE_FAILURE,
+      500,
+      error
+    );
+  }
+}
+```
+
+---
+
+## Validation Error Formatter
+
+We created a custom error formatter utility (`lib/zodErrorFormatter.ts`) that converts Zod errors into our standardized response format:
+
+```typescript
+import { ZodError } from "zod";
+import { sendError } from "./responseHandler";
+import { ERROR_CODES } from "./errorCodes";
+
+export function formatZodError(error: ZodError<unknown>) {
+  const formattedErrors = error.issues.map((err) => ({
+    field: err.path.join("."),
+    message: err.message,
+  }));
+
+  return sendError(
+    "Validation failed",
+    ERROR_CODES.VALIDATION_ERROR,
+    400,
+    formattedErrors
+  );
+}
+```
+
+This ensures **all validation errors** follow the same consistent format and integrate seamlessly with our global response handler.
+
+---
+
+## Error Response Format
+
+### Successful Validation (201 Created)
+
+```json
+{
+  "success": true,
+  "message": "User created successfully",
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "email": "alice@example.com",
+    "name": "Alice",
+    "role": "CANDIDATE",
+    "createdAt": "2025-12-31T08:00:00.000Z"
+  },
+  "timestamp": "2025-12-31T08:00:00.000Z"
+}
+```
+
+### Validation Error (400 Bad Request)
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "error": {
+    "code": "E001",
+    "details": [
+      {
+        "field": "email",
+        "message": "Invalid email format"
+      },
+      {
+        "field": "name",
+        "message": "Name is required"
+      }
+    ]
+  },
+  "timestamp": "2025-12-31T08:00:00.000Z"
+}
+```
+
+### Key Benefits
+
+- **Field-Level Errors**: Clients know exactly which fields failed
+- **Clear Messages**: Each error includes the specific validation rule that failed
+- **Consistent Format**: All validation errors follow the same structure
+- **HTTP 400 Status**: Proper status code for client-side errors
+
+---
+
+## Schema Reuse: Client & Server
+
+One of Zod's most powerful features is **schema reuse** across the frontend and backend.
+
+### Type Safety Benefits
+
+```typescript
+// Shared schema file: lib/validation.ts
+export const UserCreateSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(2),
+  role: RoleEnum,
+});
+
+// TypeScript type inference
+export type UserCreateInput = z.infer<typeof UserCreateSchema>;
+```
+
+### Frontend Usage (React Form)
+
+```typescript
+import { UserCreateSchema, type UserCreateInput } from "@/lib/validation";
+
+function SignupForm() {
+  const [formData, setFormData] = useState<UserCreateInput>({
+    email: "",
+    name: "",
+    role: "CANDIDATE",
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Client-side validation
+    const result = UserCreateSchema.safeParse(formData);
+    if (!result.success) {
+      // Show validation errors in UI
+      console.error(result.error.errors);
+      return;
+    }
+
+    // Submit validated data
+    await fetch("/api/users", {
+      method: "POST",
+      body: JSON.stringify(result.data),
+    });
+  };
+}
+```
+
+### Backend Usage (API Route)
+
+```typescript
+import { UserCreateSchema } from "@/lib/validation";
+
+export async function POST(req: Request) {
+  const body = await req.json();
+  const validatedData = UserCreateSchema.parse(body); // Server-side validation
+  // ...
+}
+```
+
+### Benefits of Schema Reuse
+
+✅ **Single Source of Truth**: One schema for both frontend and backend  
+✅ **Type Safety**: TypeScript ensures form data matches API expectations  
+✅ **DRY Principle**: No duplicate validation logic  
+✅ **Consistency**: Frontend and backend always validate the same way  
+✅ **Easy Updates**: Change validation rules in one place
+
+---
+
+## Testing Validation
+
+### Test Case 1: Valid User Creation ✅
+
+**Request:**
+
+```powershell
+Invoke-WebRequest -Uri "http://localhost:3000/api/users" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{"email":"test@example.com","name":"Test User","role":"CANDIDATE"}' `
+  -UseBasicParsing
+```
+
+**Expected Response:** `201 Created`
+
+```json
+{
+  "success": true,
+  "message": "User created successfully",
+  "data": { "id": "...", "email": "test@example.com", "name": "Test User" }
+}
+```
+
+---
+
+### Test Case 2: Invalid Email Format ❌
+
+**Request:**
+
+```powershell
+Invoke-WebRequest -Uri "http://localhost:3000/api/users" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{"email":"not-an-email","name":"Test"}' `
+  -UseBasicParsing
+```
+
+**Expected Response:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "error": {
+    "code": "E001",
+    "details": [{ "field": "email", "message": "Invalid email format" }]
+  }
+}
+```
+
+---
+
+### Test Case 3: Missing Required Field ❌
+
+**Request:**
+
+```powershell
+Invoke-WebRequest -Uri "http://localhost:3000/api/tasks" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{}' `
+  -UseBasicParsing
+```
+
+**Expected Response:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "error": {
+    "code": "E001",
+    "details": [{ "field": "title", "message": "Title is required" }]
+  }
+}
+```
+
+---
+
+### Test Case 4: Invalid UUID Format ❌
+
+**Request:**
+
+```powershell
+Invoke-WebRequest -Uri "http://localhost:3000/api/applications" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{"jobId":"invalid-uuid","candidateId":"also-invalid"}' `
+  -UseBasicParsing
+```
+
+**Expected Response:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "error": {
+    "code": "E001",
+    "details": [
+      { "field": "jobId", "message": "Invalid job ID" },
+      { "field": "candidateId", "message": "Invalid candidate ID" }
+    ]
+  }
+}
+```
+
+---
+
+## Maintainability & Team Benefits
+
+### Why Centralized Schemas Matter
+
+#### 1. **Single Source of Truth**
+
+All validation logic lives in `lib/validation.ts`. When requirements change, you update one file instead of hunting through dozens of API routes.
+
+**Example:** If the email validation rule changes to require a specific domain:
+
+```typescript
+// Update once in lib/validation.ts
+email: z.string()
+  .email()
+  .refine(
+    (email) => email.endsWith("@company.com"),
+    "Only company emails allowed"
+  );
+```
+
+This change automatically applies to all API routes and frontend forms using this schema.
+
+---
+
+#### 2. **Type Safety Across the Stack**
+
+Using `z.infer` creates TypeScript types that stay in sync with validation rules:
+
+```typescript
+export type UserCreateInput = z.infer<typeof UserCreateSchema>;
+```
+
+If you add a new required field to the schema, TypeScript will immediately flag all places where the type is incomplete.
+
+---
+
+#### 3. **Easier Testing**
+
+Schemas can be unit tested independently:
+
+```typescript
+describe("UserCreateSchema", () => {
+  it("should reject invalid email", () => {
+    const result = UserCreateSchema.safeParse({ email: "bad-email" });
+    expect(result.success).toBe(false);
+  });
+});
+```
+
+---
+
+#### 4. **Better Onboarding**
+
+New developers can:
+
+- Read `lib/validation.ts` to understand all API contracts
+- See exactly which fields are required vs optional
+- Understand validation rules without reading documentation
+
+---
+
+#### 5. **Prevents Runtime Bugs**
+
+**Before Zod:**
+
+```typescript
+// Runtime error if email is missing
+const user = await prisma.user.create({ data: body });
+// Error: null value in column "email" violates not-null constraint
+```
+
+**With Zod:**
+
+```typescript
+const validatedData = UserCreateSchema.parse(body);
+// Validation fails immediately with clear error message
+// Database never sees invalid data
+```
+
+---
+
+### Scaling Considerations
+
+As the application grows:
+
+✅ **Adding New Endpoints**: Copy the validation pattern, no learning curve  
+✅ **Changing Requirements**: Update schema once, applies everywhere  
+✅ **API Documentation**: Schemas serve as machine-readable API specs  
+✅ **Frontend-Backend Sync**: Shared schemas prevent API contract drift
+
+---
+
+## Reflection: Validation Consistency in Team Projects
+
+### Impact on Development Velocity
+
+**Without Validation:**
+
+- Developers spend hours debugging "data corruption" issues
+- Backend teams and frontend teams blame each other for bugs
+- Production incidents caused by unexpected data formats
+- Extensive manual testing required for every change
+
+**With Zod Validation:**
+
+- Input errors are caught immediately during development
+- Clear error messages guide developers to fix issues
+- Frontend and backend teams share the same contracts
+- Confidence that database only receives clean data
+
+---
+
+### Real-World Scenario
+
+**Problem:** A recruiter form sends `jobType: "fulltime"` (lowercase) but the database expects `FULL_TIME` (enum).
+
+**Without Validation:**
+
+- Request silently fails or corrupts data
+- Error appears in logs as generic database constraint violation
+- Frontend developer doesn't know what went wrong
+- Backend developer blames frontend for sending wrong data
+
+**With Zod Validation:**
+
+- Schema validates against enum: `JobTypeEnum`
+- Immediate 400 error: `"jobType must be one of: FULL_TIME, PART_TIME, CONTRACT, INTERNSHIP"`
+- Frontend developer knows exactly what to fix
+- Issue resolved in minutes, not hours
+
+---
+
+### Team Communication
+
+Validation schemas become **living documentation**:
+
+```typescript
+// Instead of writing this in a wiki:
+// "The POST /api/jobs endpoint requires: title (string),
+//  company (string), location (string), jobType (enum), etc."
+
+// Just point developers to the schema:
+export const JobCreateSchema = z.object({
+  title: z.string().min(1),
+  company: z.string().min(1),
+  location: z.string().min(1),
+  jobType: JobTypeEnum,
+  // ...
+});
+```
+
+The schema **is** the documentation, and it's always up-to-date because it's the code.
+
+---
+
+## Summary
+
+### Files Modified/Created
+
+- ✅ [`lib/validation.ts`](file:///C:/Users/kaviraja/Desktop/Hire-loop/lib/validation.ts) - Added TaskCreateSchema
+- ✅ [`lib/zodErrorFormatter.ts`](file:///C:/Users/kaviraja/Desktop/Hire-loop/lib/zodErrorFormatter.ts) - **NEW** validation error formatter
+- ✅ [`app/api/users/route.ts`](file:///C:/Users/kaviraja/Desktop/Hire-loop/app/api/users/route.ts) - Added ZodError handling
+- ✅ [`app/api/jobs/route.ts`](file:///C:/Users/kaviraja/Desktop/Hire-loop/app/api/jobs/route.ts) - Added ZodError handling
+- ✅ [`app/api/applications/route.ts`](file:///C:/Users/kaviraja/Desktop/Hire-loop/app/api/applications/route.ts) - Added ZodError handling
+- ✅ [`app/api/tasks/route.ts`](file:///C:/Users/kaviraja/Desktop/Hire-loop/app/api/tasks/route.ts) - Added validation + ZodError handling
+
+### Key Benefits Delivered
+
+✅ **Type-Safe Validation**: All inputs validated before reaching business logic  
+✅ **Clear Error Messages**: Field-level validation errors with specific messages  
+✅ **Schema Reuse**: Same schemas used on frontend and backend  
+✅ **Consistent Format**: All validation errors follow standardized response structure  
+✅ **Better DX**: Developers see exactly which fields failed and why  
+✅ **Production Safety**: Invalid data never reaches the database
+
+---

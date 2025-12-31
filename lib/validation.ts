@@ -80,6 +80,15 @@ export const ApplicationUpdateSchema = z.object({
   status: ApplicationStatusEnum,
 });
 
+// Task schemas
+export const TaskCreateSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z
+    .string()
+    .min(10, "Description must be at least 10 characters")
+    .optional(),
+});
+
 // Type exports for TypeScript inference
 export type UserCreateInput = z.infer<typeof UserCreateSchema>;
 export type UserUpdateInput = z.infer<typeof UserUpdateSchema>;
@@ -87,3 +96,4 @@ export type JobCreateInput = z.infer<typeof JobCreateSchema>;
 export type JobUpdateInput = z.infer<typeof JobUpdateSchema>;
 export type ApplicationCreateInput = z.infer<typeof ApplicationCreateSchema>;
 export type ApplicationUpdateInput = z.infer<typeof ApplicationUpdateSchema>;
+export type TaskCreateInput = z.infer<typeof TaskCreateSchema>;
