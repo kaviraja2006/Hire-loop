@@ -2,7 +2,7 @@ import { type ReactNode } from "react";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { LayoutWrapper } from "@/components";
+import LayoutWrapper from "@/components/layout/LayoutWrapper";
 // import { ClerkProvider } from "@clerk/nextjs"; // Disabled - using manual JWT auth
 import { ThemeProvider } from "@/components/theme-provider";
 import Footer from "@/components/features/layout/Footer";
