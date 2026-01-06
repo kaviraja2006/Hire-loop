@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+// import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs"; // Disabled - using manual JWT auth
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
@@ -30,18 +30,19 @@ export default function NavbarActions() {
       )}
 
       <div className="flex items-center gap-2">
-        <SignedOut>
-          <Button asChild variant={"ghost"} size="sm">
-            <Link href={"/sign-in"}>Sign In</Link>
-          </Button>
-        </SignedOut>
+        {/* Manual JWT Authentication - Sign in button for demonstration */}
+        <Button asChild variant={"ghost"} size="sm">
+          <Link href={"/sign-in"}>Sign In</Link>
+        </Button>
 
-        <SignedIn>
-          <Button asChild variant={"outline"} size={"sm"}>
-            <Link href={"/dashboard"}>Dashboard</Link>
-          </Button>
-          <UserButton />
-        </SignedIn>
+        {/* 
+          Note: For full authentication UI with login/logout state:
+          1. Store JWT token in localStorage/cookies after login
+          2. Create a custom auth context/hook to check token state
+          3. Show user menu based on token presence
+          
+          For now, this is a simple sign-in button for testing the auth APIs
+        */}
       </div>
     </div>
   );
