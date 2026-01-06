@@ -1,5 +1,10 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+// import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
+// Temporarily disable Clerk middleware to test manual JWT authentication
+// Uncomment the Clerk middleware below when you want to use Clerk instead
+
+/*
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/",
@@ -11,6 +16,12 @@ export default clerkMiddleware(async (auth, req) => {
     await auth.protect();
   }
 });
+*/
+
+// Simple passthrough middleware for manual JWT authentication
+export default function middleware() {
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [
